@@ -16,6 +16,8 @@ use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Service\MarkerBasedTemplateService;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Core\Utility\HttpUtility;
+use TYPO3\CMS\Extbase\Object\ObjectManager;
+use TYPO3\CMS\Fluid\View\StandaloneView;
 
 /**
  * Abstract plugin class for the 'dlf' extension
@@ -60,6 +62,11 @@ abstract class AbstractPlugin extends \TYPO3\CMS\Frontend\Plugin\AbstractPlugin
     protected $templateService;
 
     /**
+     * @var \TYPO3\CMS\Extbase\Object\ObjectManager
+     */
+    protected $objectManager;
+
+    /**
      * Read and parse the template file
      *
      * @access protected
@@ -81,6 +88,16 @@ abstract class AbstractPlugin extends \TYPO3\CMS\Frontend\Plugin\AbstractPlugin
         // Substitute strings like "EXT:" in given template file location.
         $fileResource = $GLOBALS['TSFE']->tmpl->getFileName($templateFile);
         $this->template = $this->templateService->getSubpart(file_get_contents($fileResource), $part);
+    }
+
+    /**
+     * Generate Path to Fluid Standalone Templates
+     * @access protected
+     *
+     * @return string
+     */
+    protected function getFluidStandaloneTemplate() {
+        return 'EXT:' . $this->extKey . '/Resources/Private/Templates/' . Helper::getUnqualifiedClassName(get_class($this)) . '.html';
     }
 
     /**
@@ -126,6 +143,26 @@ abstract class AbstractPlugin extends \TYPO3\CMS\Frontend\Plugin\AbstractPlugin
         $this->pi_setPiVarDefaults();
         // Load translation files.
         $this->pi_loadLL('EXT:' . $this->extKey . '/Resources/Private/Language/' . Helper::getUnqualifiedClassName(get_class($this)) . '.xml');
+
+        /** @var objectManager */
+        $this->objectManager = GeneralUtility::makeInstance(ObjectManager::class);
+    }
+
+
+    /**
+     * Automatically loads and renders html content from Fluid templates in template folder. The file have to be the plugin name.
+     * @param array $data
+     * @return mixed
+     */
+    protected function generateContentWithFluidStandaloneView($data = []) {
+        $standaloneView = $this->objectManager->get(StandaloneView::class);
+        $templatePath = GeneralUtility::getFileAbsFileName($this->getFluidStandaloneTemplate());
+
+        $standaloneView->setFormat('html');
+        $standaloneView->setTemplatePathAndFilename($templatePath);
+        $standaloneView->assignMultiple($data);
+
+        return $standaloneView->render();
     }
 
     /**

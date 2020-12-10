@@ -133,19 +133,26 @@ class TableOfContents extends \Kitodo\Dlf\Common\AbstractPlugin
     {
         $this->init($conf);
         // Check for typoscript configuration to prevent fatal error.
-        if (empty($this->conf['menuConf.'])) {
-            Helper::devLog('Incomplete plugin configuration', DEVLOG_SEVERITY_WARNING);
-            return $content;
+        $this->loadDocument();
+
+        if ($this->doc !== null && $this->doc->getTitledata()['type'][0] === 'video') {
+            return $this->pi_wrapInBaseClass($this->generateContentWithFluidStandaloneView($this->doc->tableOfContents[0]));
+        } else {
+            if (empty($this->conf['menuConf.'])) {
+                Helper::devLog('Incomplete plugin configuration', DEVLOG_SEVERITY_WARNING);
+                return $content;
+            }
+            // Load template file.
+
+            $this->getTemplate();
+            $TSconfig = [];
+            $TSconfig['special'] = 'userfunction';
+            $TSconfig['special.']['userFunc'] = \Kitodo\Dlf\Plugin\TableOfContents::class . '->makeMenuArray';
+            $TSconfig = Helper::mergeRecursiveWithOverrule($this->conf['menuConf.'], $TSconfig);
+            $markerArray['###TOCMENU###'] = $this->cObj->cObjGetSingle('HMENU', $TSconfig);
+            $content .= $this->templateService->substituteMarkerArray($this->template, $markerArray);
+            return $this->pi_wrapInBaseClass($content);
         }
-        // Load template file.
-        $this->getTemplate();
-        $TSconfig = [];
-        $TSconfig['special'] = 'userfunction';
-        $TSconfig['special.']['userFunc'] = \Kitodo\Dlf\Plugin\TableOfContents::class . '->makeMenuArray';
-        $TSconfig = Helper::mergeRecursiveWithOverrule($this->conf['menuConf.'], $TSconfig);
-        $markerArray['###TOCMENU###'] = $this->cObj->cObjGetSingle('HMENU', $TSconfig);
-        $content .= $this->templateService->substituteMarkerArray($this->template, $markerArray);
-        return $this->pi_wrapInBaseClass($content);
     }
 
     /**

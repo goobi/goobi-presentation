@@ -130,6 +130,7 @@ final class MetsDocument extends Document
     public function addMetadataFromMets(&$metadata, $id)
     {
         $details = $this->getLogicalStructure($id);
+
         if (!empty($details)) {
             $metadata['mets_label'][0] = $details['label'];
             $metadata['mets_orderlabel'][0] = $details['orderlabel'];
@@ -334,6 +335,11 @@ final class MetsDocument extends Document
             // Check if file has valid @USE attribute.
             if (!empty($fileUse[(string) $fptr->attributes()->FILEID])) {
                 $details['files'][$fileUse[(string) $fptr->attributes()->FILEID]] = (string) $fptr->attributes()->FILEID;
+                if (!empty($fptr->children('http://www.loc.gov/METS/'))) {
+                    foreach ($fptr->children('http://www.loc.gov/METS/')->attributes() as $key => $value) {
+                        $details['files']['area'][$key] = (string) $value;
+                    }
+                }
             }
         }
         // Keep for later usage.
@@ -850,6 +856,9 @@ final class MetsDocument extends Document
             }
             if (!empty($extConf['fileGrpAudio'])) {
                 $useGrps[] = $extConf['fileGrpAudio'];
+            }
+            if (!empty($extConf['fileGrpVideo'])) {
+                $useGrps[] = $extConf['fileGrpVideo'];
             }
             // Get all file groups.
             $fileGrps = $this->mets->xpath('./mets:fileSec/mets:fileGrp');
