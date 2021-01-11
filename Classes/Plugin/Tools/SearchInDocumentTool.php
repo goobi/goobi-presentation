@@ -100,10 +100,20 @@ class SearchInDocumentTool extends \Kitodo\Dlf\Common\AbstractPlugin
             'forceAbsoluteUrl.' => ['scheme' => !empty($this->conf['forceAbsoluteUrlHttps']) ? 'https' : 'http']
         ];
 
+        $actionUrl = $this->cObj->typoLink_URL($linkConf);
+        $currentDocument = $this->doc->uid;
+
+        // split the given URL for DDB Zeitungsportal
+        if (intval($this->conf['isIndexRemapped']) === 1) {
+            $pathElements = explode("/", $currentDocument);
+            $actionUrl = $pathElements[0] . '//' . $pathElements[2] . '/ddb-current/newspaper/';
+            $currentDocument = $pathElements[5];
+        }
+
         $encryptedSolr = $this->getEncryptedCoreName();
         // Fill markers.
         $markerArray = [
-            '###ACTION_URL###' => $this->cObj->typoLink_URL($linkConf),
+            '###ACTION_URL###' => $actionUrl,
             '###LABEL_QUERY###' => htmlspecialchars($this->pi_getLL('label.query')),
             '###LABEL_DELETE_SEARCH###' => htmlspecialchars($this->pi_getLL('label.delete_search')),
             '###LABEL_LOADING###' => htmlspecialchars($this->pi_getLL('label.loading')),
@@ -113,8 +123,8 @@ class SearchInDocumentTool extends \Kitodo\Dlf\Common\AbstractPlugin
             '###LABEL_PREVIOUS###' => htmlspecialchars($this->pi_getLL('label.previous')),
             '###LABEL_PAGE###' => htmlspecialchars($this->pi_getLL('label.logicalPage')),
             '###LABEL_NORESULT###' => htmlspecialchars($this->pi_getLL('label.noresult')),
-            '###CURRENT_DOCUMENT###' => $this->doc->uid,
-            '###SOLR_ENCRYPTED###' => $encryptedSolr ? : '',
+            '###CURRENT_DOCUMENT###' => $currentDocument,
+            '###SOLR_ENCRYPTED###' => $encryptedSolr ? : ''
         ];
 
         $content .= $this->templateService->substituteMarkerArray($this->template, $markerArray);
