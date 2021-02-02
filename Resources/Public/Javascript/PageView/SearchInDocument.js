@@ -81,11 +81,11 @@ function getBaseUrl() {
 }
 
 $(document).ready(function() {
-    $("#tx-dlf-search-in-document-form").submit(function(event) {
-        // Stop form from submitting normally
-        alert("Handler for .submit() called.");
-        event.preventDefault();
-        event.stopPropagation();
+    alert("Document is ready...");
+    $("#tx-dlf-search-in-document-button").click(function() {
+        resetStart();
+
+        alert("Handler for .click() called...");
 
         $('#tx-dlf-search-in-document-loading').show();
         $('#tx-dlf-search-in-document-clearing').hide();
@@ -103,6 +103,7 @@ $(document).ready(function() {
                 hashed: $( "input[name='tx_dlf[hashed]']" ).val(),
             },
             function(data) {
+                console.log(data);
                 var resultItems = [];
                 var resultList = '<div class="results-active-indicator"></div><ul>';
                 var start = -1;
