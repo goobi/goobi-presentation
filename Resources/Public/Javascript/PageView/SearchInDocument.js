@@ -15,9 +15,9 @@
  * @returns void
  */
 function nextResultPage() {
-    var currentStart = $("#tx-dlf-search-in-document-form input[name='tx_dlf[start]']").val();
+    var currentStart = $("#tx-dlf-search-in-document-form input[id='tx-dlf-search-in-document-start']").val();
     var newStart = parseInt(currentStart) + 20;
-    $("#tx-dlf-search-in-document-form input[name='tx_dlf[start]']").val(newStart);
+    $("#tx-dlf-search-in-document-form input[id='tx-dlf-search-in-document-start']").val(newStart);
     $('#tx-dlf-search-in-document-form').submit();
 };
 
@@ -28,9 +28,9 @@ function nextResultPage() {
  * @returns void
  */
 function previousResultPage() {
-    var currentStart = $("#tx-dlf-search-in-document-form input[name='tx_dlf[start]']").val();
+    var currentStart = $("#tx-dlf-search-in-document-form input[id='tx-dlf-search-in-document-start']").val();
     var newStart = (parseInt(currentStart) > 20) ? (parseInt(currentStart) - 20) : 0;
-    $("#tx-dlf-search-in-document-form input[name='tx_dlf[start]']").val(newStart);
+    $("#tx-dlf-search-in-document-form input[id='tx-dlf-search-in-document-start']").val(newStart);
     $('#tx-dlf-search-in-document-form').submit();
 };
 
@@ -40,7 +40,7 @@ function previousResultPage() {
  * @returns void
  */
 function resetStart() {
-    $("#tx-dlf-search-in-document-form input[name='tx_dlf[start]']").val(0);
+    $("#tx-dlf-search-in-document-form input[id='tx-dlf-search-in-document-start']").val(0);
 }
 
 /**
@@ -52,6 +52,7 @@ function resetStart() {
 function addHighlightEffect(highlightIds) {
     if (highlightIds.length > 0) {
         highlightIds.forEach(function (highlightId) {
+            console.log(highlightId)
             var targetElement = $('#' + highlightId);
     
             if (targetElement.length > 0 && !targetElement.hasClass('highlight')) {
@@ -72,6 +73,13 @@ function getBaseUrl() {
     // - http://example.com/index.php?id=14
     // - http://example.com/workview (using slug on page with uid=14)
     var baseUrl = $("form#tx-dlf-search-in-document-form").attr('action');
+    var url = window.location.href
+
+    // it is specific to DDB Zeitungsportal
+    // TODO: make this solution more generic
+    if(baseUrl.indexOf('ddb-current/newspaper/item')) {
+        baseUrl = url
+    }
 
     if (baseUrl.indexOf('?') > 0) {
         baseUrl += '&';
@@ -107,11 +115,10 @@ function search() {
         "https://sdvtypo3ddbzeitungsportaldev.slub-dresden.de/",
         {
             eID: "tx_dlf_search_in_document",
-            q: $("input[name='tx_dlf[query]']").val(),
-            uid: $("input[name='tx_dlf[id]']").val(),
-            start: $("input[name='tx_dlf[start]']").val(),
-            encrypted: $("input[name='tx_dlf[encrypted]']").val(),
-            hashed: $("input[name='tx_dlf[hashed]']").val(),
+            q: $("input[id='tx-dlf-search-in-document-query']").val(),
+            uid: $("input[id='tx-dlf-search-in-document-id']").val(),
+            start: $("input[id='tx-dlf-search-in-document-start']").val(),
+            encrypted: $("input[id='tx-dlf-search-in-document-encrypted']").val(),
         },
         function (data) {
             console.log(data);
@@ -126,11 +133,10 @@ function search() {
                     var searchWord = element['snippet'];
                     searchWord = searchWord.substring(searchWord.indexOf('<em>') + 4, searchWord.indexOf('</em>'));
 
-                    //TODO: make params configurable
                     var link = getBaseUrl()
-                        + 'tx_dlf[id]=' + element['uid']
-                        + '&tx_dlf[highlight_word]=' + encodeURIComponent(searchWord)
-                        + '&tx_dlf[page]=' + element['page'];
+                        + $("input[id='tx-dlf-search-in-document-id']").attr('name') + '=' + element['uid']
+                        + '&' + $("input[id='tx-dlf-search-in-document-highlight-word']").attr('name') + '=' + encodeURIComponent(searchWord)
+                        + '&' + $("input[id='tx-dlf-search-in-document-page']").attr('name') + '=' + element['page'];
 
                     if (element['snippet'].length > 0) {
                         resultItems[element['page']] = '<span class="structure">'

@@ -124,6 +124,12 @@ class SearchInDocumentTool extends \Kitodo\Dlf\Common\AbstractPlugin
             '###LABEL_PREVIOUS###' => htmlspecialchars($this->pi_getLL('label.previous')),
             '###LABEL_PAGE###' => htmlspecialchars($this->pi_getLL('label.logicalPage')),
             '###LABEL_NORESULT###' => htmlspecialchars($this->pi_getLL('label.noresult')),
+            '###LABEL_QUERY_URL###' => $this->conf['queryInputName'],
+            '###LABEL_START###' => $this->conf['startInputName'],
+            '###LABEL_ID###' => $this->conf['idInputName'],
+            '###LABEL_PAGE_URL###' => $this->conf['pageInputName'],
+            '###LABEL_HIGHLIGHT_WORD###' => $this->conf['highlightWordInputName'],
+            '###LABEL_ENCRYPTED###' => $this->conf['encryptedInputName'],
             '###CURRENT_DOCUMENT###' => $currentDocument,
             '###SOLR_ENCRYPTED###' => $encryptedSolr ? : ''
         ];
