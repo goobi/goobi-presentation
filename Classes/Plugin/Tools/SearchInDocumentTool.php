@@ -100,34 +100,9 @@ class SearchInDocumentTool extends \Kitodo\Dlf\Common\AbstractPlugin
             'forceAbsoluteUrl.' => ['scheme' => !empty($this->conf['forceAbsoluteUrlHttps']) ? 'https' : 'http']
         ];
 
-        $actionUrl = $this->cObj->typoLink_URL($linkConf);
-        $currentDocument = $this->doc->uid;
-
-        if (!empty($this->conf['searchUrl'])) {
-            $actionUrl = $this->conf['searchUrl'];
-        }
-
-        var_dump($currentDocument);
-
-        if (!empty($this->conf['documentIdUrlSchema'])) {
-            $arr = explode('*', $this->conf['documentIdUrlSchema']);
-            var_dump($arr);
-            if(count($arr) == 2) {
-                $currentDocument = explode($arr[0], $currentDocument)[0];
-                var_dump(explode($arr[0], $currentDocument)[0]);
-            } else if(count($arr) == 3) {
-                $sub = substr($currentDocument, strpos($currentDocument, $arr[0]) + strlen($arr[0]), strlen($currentDocument));
-                var_dump($sub);
-                $currentDocument = substr($sub, 0, strpos($sub, $arr[2]));
-            }
-        }
-
-        var_dump($currentDocument);
-
-        $encryptedSolr = $this->getEncryptedCoreName();
         // Fill markers.
         $markerArray = [
-            '###ACTION_URL###' => $actionUrl,
+            '###ACTION_URL###' => $this->getActionUrl(),
             '###LABEL_QUERY###' => htmlspecialchars($this->pi_getLL('label.query')),
             '###LABEL_DELETE_SEARCH###' => htmlspecialchars($this->pi_getLL('label.delete_search')),
             '###LABEL_LOADING###' => htmlspecialchars($this->pi_getLL('label.loading')),
@@ -143,12 +118,53 @@ class SearchInDocumentTool extends \Kitodo\Dlf\Common\AbstractPlugin
             '###LABEL_PAGE_URL###' => $this->conf['pageInputName'],
             '###LABEL_HIGHLIGHT_WORD###' => $this->conf['highlightWordInputName'],
             '###LABEL_ENCRYPTED###' => $this->conf['encryptedInputName'],
-            '###CURRENT_DOCUMENT###' => $currentDocument,
-            '###SOLR_ENCRYPTED###' => $encryptedSolr ? : ''
+            '###CURRENT_DOCUMENT###' => $this->getCurrentDocumentId(),
+            '###SOLR_ENCRYPTED###' => $this->getEncryptedCoreName() ? : ''
         ];
 
         $content .= $this->templateService->substituteMarkerArray($this->template, $markerArray);
         return $this->pi_wrapInBaseClass($content);
+    }
+
+    /**
+     * Get the action url for search form
+     *
+     * @access protected
+     *
+     * @return string with action url for search form
+     */
+    protected function getActionUrl()
+    {
+        $actionUrl = $this->cObj->typoLink_URL($linkConf);
+
+        if (!empty($this->conf['searchUrl'])) {
+            $actionUrl = $this->conf['searchUrl'];
+        }
+        return $actionUrl;
+    }
+
+    /**
+     * Get current document id
+     *
+     * @access protected
+     *
+     * @return string with current document id
+     */
+    protected function getCurrentDocumentId()
+    {
+        $id = $this->doc->uid;
+
+        if (!empty($this->conf['documentIdUrlSchema'])) {
+            $arr = explode('*', $this->conf['documentIdUrlSchema']);
+
+            if(count($arr) == 2) {
+                $id = explode($arr[0], $id)[0];
+            } else if(count($arr) == 3) {
+                $sub = substr($id, strpos($id, $arr[0]) + strlen($arr[0]), strlen($id));
+                $id = substr($sub, 0, strpos($sub, $arr[2]));
+            }
+        }
+        return $id;
     }
 
     /**
