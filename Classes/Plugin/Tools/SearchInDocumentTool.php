@@ -93,13 +93,6 @@ class SearchInDocumentTool extends \Kitodo\Dlf\Common\AbstractPlugin
         // Load template file.
         $this->getTemplate();
 
-        // Configure @action URL for form.
-        $linkConf = [
-            'parameter' => $GLOBALS['TSFE']->id,
-            'forceAbsoluteUrl' => 1,
-            'forceAbsoluteUrl.' => ['scheme' => !empty($this->conf['forceAbsoluteUrlHttps']) ? 'https' : 'http']
-        ];
-
         // Fill markers.
         $markerArray = [
             '###ACTION_URL###' => $this->getActionUrl(),
@@ -135,6 +128,13 @@ class SearchInDocumentTool extends \Kitodo\Dlf\Common\AbstractPlugin
      */
     protected function getActionUrl()
     {
+        // Configure @action URL for form.
+        $linkConf = [
+            'parameter' => $GLOBALS['TSFE']->id,
+            'forceAbsoluteUrl' => 1,
+            'forceAbsoluteUrl.' => ['scheme' => !empty($this->conf['forceAbsoluteUrlHttps']) ? 'https' : 'http']
+        ];
+
         $actionUrl = $this->cObj->typoLink_URL($linkConf);
 
         if (!empty($this->conf['searchUrl'])) {
@@ -157,9 +157,9 @@ class SearchInDocumentTool extends \Kitodo\Dlf\Common\AbstractPlugin
         if (!empty($this->conf['documentIdUrlSchema'])) {
             $arr = explode('*', $this->conf['documentIdUrlSchema']);
 
-            if(count($arr) == 2) {
+            if (count($arr) == 2) {
                 $id = explode($arr[0], $id)[0];
-            } else if(count($arr) == 3) {
+            } else if (count($arr) == 3) {
                 $sub = substr($id, strpos($id, $arr[0]) + strlen($arr[0]), strlen($id));
                 $id = substr($sub, 0, strpos($sub, $arr[2]));
             }
