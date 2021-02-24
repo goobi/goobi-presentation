@@ -14,6 +14,11 @@ namespace Kitodo\Dlf\Plugin;
 
 use Kitodo\Dlf\Common\Helper;
 use Kitodo\Dlf\Common\IiifManifest;
+use TYPO3\CMS\Core\Page\PageRenderer;
+use TYPO3\CMS\Core\Utility\ExtensionManagementUtility;
+use TYPO3\CMS\Core\Utility\GeneralUtility;
+use TYPO3\CMS\Core\Utility\MathUtility;
+use TYPO3\CMS\Core\Utility\PathUtility;
 use Ubl\Iiif\Presentation\Common\Model\Resources\ManifestInterface;
 use Ubl\Iiif\Presentation\Common\Vocabulary\Motivation;
 
@@ -30,6 +35,14 @@ class PageView extends \Kitodo\Dlf\Common\AbstractPlugin
     public $scriptRelPath = 'Classes/Plugin/PageView.php';
 
     /**
+     * Holds the attributions for the digital object
+     *
+     * @var array
+     * @access protected
+     */
+    protected $attributions = [];
+
+    /**
      * Holds the controls to add to the map
      *
      * @var array
@@ -37,6 +50,41 @@ class PageView extends \Kitodo\Dlf\Common\AbstractPlugin
      */
     protected $controls = [];
 
+    /**
+     * Holds the controls' translated labels
+     *
+     * @var array
+     * @access protected
+     */
+    protected $controlLabels = [];
+
+    /**
+     * Holds the controls' HTML element targets
+     *
+     * @var array
+     * @access protected
+     */
+    protected $controlTargets = [];
+
+    /**
+     * Holds the controls' translated titles
+     *
+     * @var array
+     * @access protected
+     */
+    protected $controlTitles = [];
+
+    /**
+     * Holds the custom MIMETYPEs for image server protocols
+     *
+     * @var array
+     * @access protected
+     */
+    protected $customMimetypes = [
+        'IIIF' => 'application/vnd.kitodo.iiif',
+        'IIP' => 'application/vnd.netfpx',
+        'ZOOMIFY' => 'application/vnd.kitodo.zoomify'
+    ];
     /**
      * Holds the current images' URLs and MIME types
      *
@@ -52,6 +100,14 @@ class PageView extends \Kitodo\Dlf\Common\AbstractPlugin
      * @access protected
      */
     protected $fulltexts = [];
+
+    /**
+     * Should we use the internal proxy to access images?
+     *
+     * @var bool
+     * @access protected
+     */
+    protected $useInternalProxy = false;
 
     /**
      * Holds the current AnnotationLists / AnnotationPages
@@ -70,28 +126,30 @@ class PageView extends \Kitodo\Dlf\Common\AbstractPlugin
      */
     protected function addViewerJS()
     {
-        $markerArray = '';
+        $markerArray = [];
         // CSS files.
         $cssFiles = [
-            'Resources/Public/Javascript/OpenLayers/ol3.css'
+            // OpenLayers
+            'Resources/Public/Stylesheets/OpenLayers/ol.css',
+            // Viewer
+            'Resources/Public/Stylesheets/PageView/PageView.css'
         ];
         // Javascript files.
         $jsFiles = [
             // OpenLayers
-            'Resources/Public/Javascript/OpenLayers/glif.min.js',
-            'Resources/Public/Javascript/OpenLayers/ol3-dlf.js',
+            'Resources/Public/Javascript/OpenLayers/ol.js',
+            'Resources/Public/Javascript/OpenLayers/AnnotationControl.js',
+            'Resources/Public/Javascript/OpenLayers/FulltextControl.js',
+            'Resources/Public/Javascript/OpenLayers/ImageManipulationControl.js',
+            'Resources/Public/Javascript/OpenLayers/MagnifyControl.js',
+            'Resources/Public/Javascript/OpenLayers/RotateControl.js',
             // Viewer
             'Resources/Public/Javascript/PageView/Utility.js',
-            'Resources/Public/Javascript/PageView/OL3.js',
-            'Resources/Public/Javascript/PageView/OL3Styles.js',
-            'Resources/Public/Javascript/PageView/OL3Sources.js',
-            'Resources/Public/Javascript/PageView/AltoParser.js',
-            'Resources/Public/Javascript/PageView/AnnotationParser.js',
-            'Resources/Public/Javascript/PageView/AnnotationControl.js',
-            'Resources/Public/Javascript/PageView/ImageManipulationControl.js',
-            'Resources/Public/Javascript/PageView/FulltextDownloadControl.js',
-            'Resources/Public/Javascript/PageView/FulltextControl.js',
-            'Resources/Public/Javascript/PageView/FullTextUtility.js',
+            // 'Resources/Public/Javascript/PageView/AltoParser.js',
+            // 'Resources/Public/Javascript/PageView/AnnotationParser.js',
+            // 'Resources/Public/Javascript/PageView/FulltextDownloadControl.js',
+            // 'Resources/Public/Javascript/PageView/FulltextControl.js',
+            // 'Resources/Public/Javascript/PageView/FullTextUtility.js',
             'Resources/Public/Javascript/PageView/PageView.js'
         ];
         // Viewer configuration.
@@ -99,43 +157,48 @@ class PageView extends \Kitodo\Dlf\Common\AbstractPlugin
             $(document).ready(function() {
                 if (dlfUtils.exists(dlfViewer)) {
                     tx_dlf_viewer = new dlfViewer({
-                        controls: ["' . implode('", "', $this->controls) . '"],
-                        div: "' . $this->conf['elementId'] . '",
+                        attributions: ' . json_encode($this->attributions) . ',
+                        controls: ' . json_encode($this->controls) . ',
+                        controlLabels: ' . json_encode($this->controlLabels) . ',
+                        controlTargets: ' . json_encode($this->controlTargets) . ',
+                        controlTitles: ' . json_encode($this->controlTitles) . ',
+                        target: "' . $this->conf['elementId'] . '",
                         images: ' . json_encode($this->images) . ',
                         fulltexts: ' . json_encode($this->fulltexts) . ',
-                        annotationContainers: ' . json_encode($this->annotationContainers) . ',
-                        useInternalProxy: ' . ($this->conf['useInternalProxy'] ? 1 : 0) . '
+                        annotations: ' . json_encode($this->annotationContainers) . ',
+                        useInternalProxy: ' . ($this->useInternalProxy ? 1 : 0) . '
                     });
                 }
             });
         ';
         // Add Javascript to page footer if not configured otherwise.
         if (empty($this->conf['addJStoBody'])) {
-            $pageRenderer = \TYPO3\CMS\Core\Utility\GeneralUtility::makeInstance(\TYPO3\CMS\Core\Page\PageRenderer::class);
+            $pageRenderer = GeneralUtility::makeInstance(PageRenderer::class);
             foreach ($cssFiles as $cssFile) {
-                $pageRenderer->addCssFile(\TYPO3\CMS\Core\Utility\PathUtility::stripPathSitePrefix(\TYPO3\CMS\Core\Utility\ExtensionManagementUtility::extPath($this->extKey)) . $cssFile);
+                $pageRenderer->addCssFile(PathUtility::stripPathSitePrefix(ExtensionManagementUtility::extPath($this->extKey)) . $cssFile);
             }
             foreach ($jsFiles as $jsFile) {
-                $pageRenderer->addJsFooterFile(\TYPO3\CMS\Core\Utility\PathUtility::stripPathSitePrefix(\TYPO3\CMS\Core\Utility\ExtensionManagementUtility::extPath($this->extKey)) . $jsFile);
+                $pageRenderer->addJsFooterFile(PathUtility::stripPathSitePrefix(ExtensionManagementUtility::extPath($this->extKey)) . $jsFile);
             }
             $pageRenderer->addJsFooterInlineCode('kitodo-pageview-configuration', $viewerConfiguration);
         } else {
             foreach ($jsFiles as $jsFile) {
-                $markerArray .= '<script type="text/javascript" src="' . \TYPO3\CMS\Core\Utility\PathUtility::stripPathSitePrefix(\TYPO3\CMS\Core\Utility\ExtensionManagementUtility::extPath($this->extKey)) . $jsFile . '"></script>' . "\n";
+                $markerArray[] = '<script type="text/javascript" src="' . PathUtility::stripPathSitePrefix(ExtensionManagementUtility::extPath($this->extKey)) . $jsFile . '"></script>';
             }
-            $markerArray .= '
+            $markerArray[] = '
                 <script type="text/javascript">
                 /*<![CDATA[*/
                 /*kitodo-pageview-configuration*/
                 ' . $viewerConfiguration . '
                 /*]]>*/
-                </script>';
+                </script>
+            ';
         }
-        return $markerArray;
+        return implode("\n", $markerArray);
     }
 
     /**
-     * Adds pageview interaction (crop, magnifier and rotation)
+     * Adds pageview interaction (crop and magnifier)
      *
      * @access protected
      *
@@ -151,11 +214,6 @@ class PageView extends \Kitodo\Dlf\Common\AbstractPlugin
             } else {
                 $markerArray['###EDITBUTTON###'] = '';
                 $markerArray['###EDITREMOVE###'] = '';
-            }
-            if ($this->conf['magnifier']) {
-                $markerArray['###MAGNIFIER###'] = '<a href="javascript: tx_dlf_viewer.activateMagnifier();" title="' . htmlspecialchars($this->pi_getLL('magnifier', '')) . '">' . htmlspecialchars($this->pi_getLL('magnifier', '')) . '</a>';
-            } else {
-                $markerArray['###MAGNIFIER###'] = '';
             }
         }
         return $markerArray;
@@ -181,11 +239,12 @@ class PageView extends \Kitodo\Dlf\Common\AbstractPlugin
             if (empty($this->piVars['page'])) {
                 $params['page'] = 1;
             }
+            // Configure @action URL for form.
             $basketConf = [
                 'parameter' => $this->conf['targetBasket'],
                 'forceAbsoluteUrl' => !empty($this->conf['forceAbsoluteUrl']) ? 1 : 0,
                 'forceAbsoluteUrl.' => ['scheme' => !empty($this->conf['forceAbsoluteUrl']) && !empty($this->conf['forceAbsoluteUrlHttps']) ? 'https' : 'http'],
-                'additionalParams' => \TYPO3\CMS\Core\Utility\GeneralUtility::implodeArrayForUrl($this->prefixId, $params, '', true, false),
+                'additionalParams' => GeneralUtility::implodeArrayForUrl($this->prefixId, $params, '', true, false),
                 'title' => $label
             ];
             $output = '<form id="addToBasketForm" action="' . $this->cObj->typoLink_URL($basketConf) . '" method="post">';
@@ -221,13 +280,16 @@ class PageView extends \Kitodo\Dlf\Common\AbstractPlugin
     {
         $image = [];
         // Get @USE value of METS fileGrp.
-        $fileGrps = \TYPO3\CMS\Core\Utility\GeneralUtility::trimExplode(',', $this->conf['fileGrps']);
+        $fileGrps = GeneralUtility::trimExplode(',', $this->conf['fileGrps']);
         while ($fileGrp = @array_pop($fileGrps)) {
             // Get image link.
             if (!empty($this->doc->physicalStructureInfo[$this->doc->physicalStructure[$page]]['files'][$fileGrp])) {
                 $image['url'] = $this->doc->getFileLocation($this->doc->physicalStructureInfo[$this->doc->physicalStructure[$page]]['files'][$fileGrp]);
-                if ($this->conf['useInternalProxy']) {
-                    // Configure @action URL for form.
+                $image['mimetype'] = $this->doc->getFileMimeType($this->doc->physicalStructureInfo[$this->doc->physicalStructure[$page]]['files'][$fileGrp]);
+                if (
+                    $this->conf['useInternalProxy']
+                    && !in_array($image['mimetype'], $this->customMimetypes)
+                ) {
                     $linkConf = [
                         'parameter' => $GLOBALS['TSFE']->id,
                         'forceAbsoluteUrl' => !empty($this->conf['forceAbsoluteUrl']) ? 1 : 0,
@@ -235,8 +297,8 @@ class PageView extends \Kitodo\Dlf\Common\AbstractPlugin
                         'additionalParams' => '&eID=tx_dlf_pageview_proxy&url=' . urlencode($image['url']),
                     ];
                     $image['url'] = $this->cObj->typoLink_URL($linkConf);
+                    $this->useInternalProxy = true;
                 }
-                $image['mimetype'] = $this->doc->getFileMimeType($this->doc->physicalStructureInfo[$this->doc->physicalStructure[$page]]['files'][$fileGrp]);
                 break;
             } else {
                 Helper::devLog('File not found in fileGrp "' . $fileGrp . '"', DEVLOG_SEVERITY_WARNING);
@@ -298,7 +360,7 @@ class PageView extends \Kitodo\Dlf\Common\AbstractPlugin
                     $annotationContainers = [];
                     /*
                      *  TODO Analyzing the annotations on the server side requires loading the annotation lists / pages
-                     *  just to determine wether they contain text annotations for painting. This will take time and lead to a bad user experience.
+                     *  just to determine whether they contain text annotations for painting. This will take time and lead to a bad user experience.
                      *  It would be better to link every annotation and analyze the data on the client side.
                      *
                      *  On the other hand, server connections are potentially better than client connections. Downloading annotation lists
@@ -364,11 +426,11 @@ class PageView extends \Kitodo\Dlf\Common\AbstractPlugin
             // Set default values if not set.
             // $this->piVars['page'] may be integer or string (physical structure @ID)
             if ((int) $this->piVars['page'] > 0 || empty($this->piVars['page'])) {
-                $this->piVars['page'] = \TYPO3\CMS\Core\Utility\MathUtility::forceIntegerInRange((int) $this->piVars['page'], 1, $this->doc->numPages, 1);
+                $this->piVars['page'] = MathUtility::forceIntegerInRange((int) $this->piVars['page'], 1, $this->doc->numPages, 1);
             } else {
                 $this->piVars['page'] = array_search($this->piVars['page'], $this->doc->physicalStructure);
             }
-            $this->piVars['double'] = \TYPO3\CMS\Core\Utility\MathUtility::forceIntegerInRange($this->piVars['double'], 0, 1, 0);
+            $this->piVars['double'] = MathUtility::forceIntegerInRange($this->piVars['double'], 0, 1, 0);
         }
         // Load template file.
         $this->getTemplate();
@@ -383,6 +445,46 @@ class PageView extends \Kitodo\Dlf\Common\AbstractPlugin
         }
         // Get the controls for the map.
         $this->controls = explode(',', $this->conf['features']);
+        $this->controlLabels = [
+            'Attribution' => htmlspecialchars($this->pi_getLL('AttributionLabel', '')),
+            'FullScreen' => htmlspecialchars($this->pi_getLL('FullScreenLabel.Inactive', '')),
+            'FullScreenActive' => htmlspecialchars($this->pi_getLL('FullScreenLabel.Active', '')),
+            'ImageManipulation' => htmlspecialchars($this->pi_getLL('ImageManipulationLabel', '')),
+            'Magnify' => htmlspecialchars($this->pi_getLL('MagnifyLabel', '')),
+            'OverviewMap' => htmlspecialchars($this->pi_getLL('OverviewMapLabel', '')),
+            'OverviewMapCollapse' => htmlspecialchars($this->pi_getLL('OverviewMapLabel.Collapse', '')),
+            'Rotate' => htmlspecialchars($this->pi_getLL('RotateLabel', '')),
+            'RotateLeft' => htmlspecialchars($this->pi_getLL('RotateLeftLabel', '')),
+            'RotateRight' => htmlspecialchars($this->pi_getLL('RotateRightLabel', '')),
+            'ZoomIn' => htmlspecialchars($this->pi_getLL('ZoomInLabel', '')),
+            'ZoomOut' => htmlspecialchars($this->pi_getLL('ZoomOutLabel', '')),
+            'ZoomToExtent' => htmlspecialchars($this->pi_getLL('ZoomToExtentLabel', ''))
+        ];
+        $this->controlTitles = [
+            'Attribution' => htmlspecialchars($this->pi_getLL('AttributionTitle', '')),
+            'FullScreen' => htmlspecialchars($this->pi_getLL('FullScreenTitle', '')),
+            'ImageManipulation' => htmlspecialchars($this->pi_getLL('ImageManipulationTitle', '')),
+            'ImageManipulationDialogTitle' => htmlspecialchars($this->pi_getLL('ImageManipulationTitle.Dialog', '')),
+            'Magnify' => htmlspecialchars($this->pi_getLL('MagnifyTitle', '')),
+            'OverviewMap' => htmlspecialchars($this->pi_getLL('OverviewMapTitle', '')),
+            'Rotate' => htmlspecialchars($this->pi_getLL('RotateTitle', '')),
+            'RotateLeft' => htmlspecialchars($this->pi_getLL('RotateLeftTitle', '')),
+            'RotateRight' => htmlspecialchars($this->pi_getLL('RotateRightTitle', '')),
+            'ZoomIn' => htmlspecialchars($this->pi_getLL('ZoomInTitle', '')),
+            'ZoomOut' => htmlspecialchars($this->pi_getLL('ZoomOutTitle', '')),
+            'ZoomToExtent' => htmlspecialchars($this->pi_getLL('ZoomToExtentTitle', ''))
+        ];
+        $this->controlTargets = [
+            'Attribution' => $this->conf['attributionElementId'] ?: '',
+            'FullScreen' => $this->conf['fullScreenElementId'] ?: '',
+            'ImageManipulation' => $this->conf['imageManipulationElementId'] ?: '',
+            'Magnify' => $this->conf['magnifyElementId'] ?: '',
+            'OverviewMap' => $this->conf['overviewMapElementId'] ?: '',
+            'Rotate' => $this->conf['rotateElementId'] ?: '',
+            'Zoom' => $this->conf['zoomElementId'] ?: '',
+            'ZoomSlider' => $this->conf['zoomSliderElementId'] ?: '',
+            'ZoomToExtent' => $this->conf['zoomToExtentElementId'] ?: ''
+        ];
         // Fill in the template markers.
         $markerArray = array_merge($this->addInteraction(), $this->addBasketForm());
         $markerArray['###JAVASCRIPT###'] = $this->addViewerJS();
