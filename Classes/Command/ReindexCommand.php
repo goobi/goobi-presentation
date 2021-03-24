@@ -69,6 +69,12 @@ class ReindexCommand extends Command
                 '[UID|index_name] of the Solr core the document should be added to.'
             )
             ->addOption(
+                'owner',
+                'o',
+                InputOption::VALUE_OPTIONAL,
+                '[UID|index_name] of the Library which should be set as owner of the documents.'
+            )
+            ->addOption(
                 'all',
                 'a',
                 InputOption::VALUE_NONE,
@@ -132,6 +138,16 @@ class ReindexCommand extends Command
             exit(1);
         }
 
+        if (!empty($input->getOption('owner'))) {
+            if (MathUtility::canBeInterpretedAsInteger($input->getOption('owner'))) {
+                $owner = MathUtility::forceIntegerInRange((int) $input->getOption('owner'), 1);
+            } else {
+                $owner = (string) $input->getOption('owner');
+            }
+        } else {
+            $owner = null;
+        }
+
         if (!empty($input->getOption('all'))) {
             // Get all documents.
             $documents = $this->getAllDocuments($startingPoint);
@@ -154,13 +170,13 @@ class ReindexCommand extends Command
             $doc = Document::getInstance($document, $startingPoint, true);
             if ($doc->ready) {
                 if ($dryRun) {
-                    $io->writeln('DRY RUN: Would index ' . $id . '/' . count($documents) . ' ' . $doc->uid . ' ("' . $doc->location . '") on UID ' . $startingPoint . ' and Solr core ' . $solrCoreUid . '.');
+                    $io->writeln('DRY RUN: Would index ' . $id . '/' . count($documents) . ' ' . $doc->uid . ' ("' . $doc->location . '") on PID ' . $startingPoint . ' and Solr core ' . $solrCoreUid . '.');
                 } else {
                     if ($io->isVerbose()) {
-                        $io->writeln(date('Y-m-d H:i:s') . ' Indexing ' . $id . '/' . count($documents) . ' ' . $doc->uid . ' ("' . $doc->location . '") on UID ' . $startingPoint . ' and Solr core ' . $solrCoreUid . '.');
+                        $io->writeln(date('Y-m-d H:i:s') . ' Indexing ' . $id . '/' . count($documents) . ' ' . $doc->uid . ' ("' . $doc->location . '") on PID ' . $startingPoint . ' and Solr core ' . $solrCoreUid . '.');
                     }
                     // ...and save it to the database...
-                    if (!$doc->save($startingPoint, $solrCoreUid)) {
+                    if (!$doc->save($startingPoint, $solrCoreUid, $owner)) {
                         $io->error('ERROR: Document "' . $id . '" not saved and indexed.');
                     }
                 }
